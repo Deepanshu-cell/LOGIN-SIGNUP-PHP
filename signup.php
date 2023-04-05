@@ -14,9 +14,13 @@
         $username = mysqli_real_escape_string($conn , $username);
         $password= mysqli_real_escape_string($conn , $password);
 
-        $sql = "SELECT * FROM `users` WHERE username='$username'";
-        $result = mysqli_query($conn,$sql);
-        $numRows = mysqli_num_rows($result);
+        $sql = "SELECT * FROM `users` WHERE username=?";
+
+        $statement = $conn->prepare($sql);
+        $statement->bind_param('s',$username);
+        $statement->execute();
+        $rows_exists = $statement->get_result()->fetch_row();
+
         $error="";
 
         if($email=="" || $password==""){
@@ -47,15 +51,18 @@
         }
 
             if($error){
-            echo "<br>Email and Password validation failure(your choice is weak): $error";
+            echo json_encode(array('msg'=>"<br>Email and Password validation failure(your choice is weak): $error",'error'=>true));
+            die();
             }else{
             // It means user already exists in database
-                    if($numRows > 0){
+                if($rows_exists){
                 $userExists = true;
-                 }
+                }
 
             if($userExists){
-                echo "<br> User already exists";
+                echo json_encode(array('msg'=>"<br> User already exists",'error'=>true));
+            die();
+
             }else{
                 
                 if($password == $confirm_password){
@@ -65,23 +72,28 @@
                         $hash_password_salt = password_hash($password,PASSWORD_DEFAULT);
                         $password = $hash_password_salt;
 
-                    $sql = "INSERT INTO `users` (`username`, `email`, `password`) VALUES ('$username', '$email', '$password')";
-
-                    $result = mysqli_query($conn , $sql);
-
-                    if($result){
-                        echo "<br>Signed up successfully";
+                    $sql = "INSERT INTO `users` (`username`, `email`, `password`) VALUES (?, ?, ?)";
+                    $statement = $conn->prepare($sql);
+                    $statement->bind_param('sss',$username,$email,$password);
+                    $statement->execute(); 
+                 
+                    if($statement){
+                        echo json_encode(array('msg'=>"<br> Signed Up successfully",'error'=>false));
 
                         session_start();
                         $_SESSION['loggedIn'] = true;
                         $_SESSION['email'] = $email;
                         $_SESSION['password'] = $hash_password_salt;
-                        header("location:home.php");
+                        // header("location:home.php");
+                        die();
                     }else{
-                        echo "failed signup due to -------> ".mysqli_error($conn);
+                        echo json_encode(array('msg'=>"'failed signup due to -------> '.mysqli_error($conn)",'error'=>true));
+                    die();
+
                     }
                 }else{
-                    echo "<br>Password and confirm password doesn't matches";
+                    echo json_encode(array('msg'=>"Password and confirm password does not matches",'error'=>true));
+                    die();
                 }
             }
                         } 
@@ -103,24 +115,60 @@
 
 <?php require 'navbar.php ';
      
-    ?>
+?>
     
-    <h1>Please Signup..</h1>
-    <form action="/LOGIN_SIGNUP_PHP/signup.php" method="post">
+    <h1 id="signup-heading">Please Signup..</h1>
+    <h1 id="error-heading" style="display:none">Error occured</h1>
+    <form method="" id="signup-form">
 
         <label for="username">User Name:</label>
-        <input type="text" name="username"> <br>
+        <input type="text" name="username" id="username"> <br>
 
         <label for="email">Email:</label>
-        <input type="text" name="email"> <br>
+        <input type="text" name="email" id="email"> <br>
 
         <label for="password">Password:</label>
-        <input type="text" name="password"><br>
+        <input type="text" name="password" id="password"><br>
 
         <label for="confirm_password">Confirm Password:</label>
-        <input type="text" name="confirm_password">
+        <input type="text" name="confirm_password" id="confirm_password">
 
-        <button type="submit">Submit</button>
+        <button type="submit" id="submit-btn">Submit</button>
     </form>
+    <h3 style="color:red" id="result"></h3>
 </body>
+<script src="jquery.js"></script>
+<script type="text/javascript">
+    $(document).ready(function(){
+
+        $('#signup-form').on('submit',function(e){
+            
+            e.preventDefault();
+
+            $.ajax({
+                url:'signup.php',
+                type:'POST',
+                data:{
+                    username:$('#username').val(),
+                    email:$('#email').val(),
+                    password:$('#password').val(),
+                    confirm_password:$('#confirm_password').val(),
+                },
+                success:function (data){
+                    // if error exists
+                    console.log(data);
+                    data = JSON.parse(data);
+                    if(data['error']){
+                        $('#result').html(data['msg']);
+                        $('#error-heading').show();
+                        $('#signup-form').hide();
+                        $('#signup-heading').hide();
+                    }else{
+                        window.location.href='home.php'
+                    }
+                }
+            })
+        })
+    })
+</script>
 </html>

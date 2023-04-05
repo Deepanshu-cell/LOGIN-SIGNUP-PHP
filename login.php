@@ -5,21 +5,21 @@
         $email = $_POST['email'];
         $password = $_POST['password'];
 
-        $sql = "SELECT password FROM `users` WHERE `email`='$email'";
+        // // prevention of sql injection
+        // $email = stripcslashes($email);
+        // $password = stripcslashes($password);
+        // $email = mysqli_real_escape_string($conn , $email);
+        // $password= mysqli_real_escape_string($conn , $password);
+
+        $sql = "SELECT password FROM `users` WHERE `email`=?";
         $statement = $conn->prepare($sql);
+        $statement->bind_param('s',$email);
         $statement->execute();
 
         $resultSet = $statement->get_result();
         $output = $resultSet->fetch_all(MYSQLI_ASSOC);
 
         $hashed_password=$output[0]["password"];
-        // $user_entered_pass = password_hash($password,PASSWORD_DEFAULT, array('cost' => 9));
-        
-        echo "<br>".$hashed_password;
-        echo "<br>".$password;
-
-        print_r(password_verify($password, $hashed_password));
-
 
         if(password_verify(trim($password),trim($hashed_password))){
             session_start();
